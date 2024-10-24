@@ -1,0 +1,137 @@
+package Hospital_Management_System;
+
+import java.awt.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Scanner;
+
+public class Patients {
+    private Connection con;
+    private Scanner sc;
+
+    public Patients(Connection conn, Scanner scc){
+        this.con = conn;
+        this.sc = scc;
+    }
+
+    public void addpatient(){
+        System.out.println("Enter Patient Name: ");
+        String name = sc.next();
+
+        sc.nextLine();
+        System.out.println("Enter Patient age: ");
+        int age = sc.nextInt();
+        System.out.println("Enter Patient gender: ");
+        String gender = sc.next();
+
+        try {
+            String query = "INSERT INTO patients(Patient_name,Patient_age,Gender) VALUES (?, ?, ?)";
+            PreparedStatement ps = con.prepareStatement(query);
+            ps.setString(1,name);
+            ps.setInt(2,age);
+            ps.setString(3,gender);
+
+            int affectedRows = ps.executeUpdate();
+            if(affectedRows>0){
+                System.out.println("Patient added Successfully");
+            }
+            else{
+                System.out.println("Failed to add Patient.");
+                System.out.println("Please Try again");
+            }
+
+        }catch (SQLException e){
+            e.printStackTrace();
+        }
+    }
+
+    public void viewPatients(){
+        String query = "SELECT * FROM patients";
+
+        try {
+            PreparedStatement ps = con.prepareStatement(query);
+            ResultSet rs = ps.executeQuery();
+
+            System.out.println("Patients: ");
+            System.out.println("+------------+-------------------------------------+-----------+----------------+");
+            System.out.println("| Patient ID |  Name                               |  Age      |  Gender        |");
+            System.out.println("+------------+-------------------------------------+-----------+----------------+");
+
+            while(rs.next()){
+               int id = rs.getInt("Patient_ID");
+               String name = rs.getString("Patient_name");
+               int age = rs.getInt("Patient_age");
+               String gender = rs.getString("Gender");
+
+
+
+                System.out.printf("|  %-10d|  %-34s |  %-8d | %-14s |\n",id,name,age,gender);
+                //%-12s = space between two bars i,e => |--12--| ....
+            }
+            System.out.println("+------------+-------------------------------------+-----------+----------------+");
+
+
+        }catch (SQLException e){
+            e.printStackTrace();
+        }
+    }
+    public boolean getPatientById(int id){
+          String query = "SELECT * FROM patients where Patient_id = ?";
+
+          try {
+              PreparedStatement ps = con.prepareStatement(query);
+              ps.setInt(1,id);
+
+              ResultSet rs = ps.executeQuery();
+              if(rs.next()){
+                    return true;
+              }
+              else{
+                  System.out.println("Sorry,The patient is not registered with us.");
+                  return false;
+              }
+          }catch (SQLException e){
+              System.out.println(e.getMessage());
+          }
+          return false;
+    }
+    public static void viewPatientHistory(Connection con,Scanner sc){
+        System.out.println("Enter the Patient ID : ");
+        int patient_ID = sc.nextInt();
+
+        String query = "SELECT * FROM patient_history WHERE patient_ID = ?";
+        try{
+            PreparedStatement ps = con.prepareStatement(query);
+            ps.setInt(1,patient_ID);
+            ResultSet rs = ps.executeQuery();
+            if(!rs.isBeforeFirst()){
+                System.out.println("Sorry,No history found for the patient.");
+                return;
+            }
+
+            System.out.println("+-----+--------------+--------------+-------------------+---------------------------+------------------------------+");
+            System.out.println("| ID  |  Patient_ID  |  Doctor_ID   | Visit_Date        | Diagnosis                 |  Treatment                   |");
+            System.out.println("+-----+--------------+--------------+-------------------+---------------------------+------------------------------+");
+
+            while(rs.next()){
+                int id = rs.getInt("ID");
+                int p_id = rs.getInt("patient_ID");
+                int d_id = rs.getInt("doctor_ID");
+                String date = rs.getString(4);
+                String dig = rs.getString(5);
+                String trt = rs.getString(6);
+                System.out.printf("|%-5d|%-14d|%-14d|%-19s|%-27s|%-30s|\n",p_id,d_id,date,dig,trt);
+
+            }
+            System.out.println("+-----+--------------+--------------+-------------------+---------------------------+------------------------------+");
+
+
+        }catch (SQLException e){
+            e.printStackTrace();
+        }
+
+    }
+
+}
