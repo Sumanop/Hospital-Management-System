@@ -1,0 +1,64 @@
+package Hospital_Management_System;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Scanner;
+
+public class Doctors {
+    private Connection con;
+
+
+    public Doctors(Connection conn){
+        this.con = conn;
+    }
+
+    public void viewDoctors(){
+        String query = "SELECT * FROM doctors";
+
+        try {
+            PreparedStatement ps = con.prepareStatement(query);
+            ResultSet rs = ps.executeQuery();
+
+            System.out.println("Doctors: ");
+            System.out.println("+------------+------------------------------------------+-----------------------------------+");
+            System.out.println("| Doctor ID  |  Name                                    |   Specialization                  |");
+            System.out.println("+------------+------------------------------------------+-----------------------------------+");
+
+            while(rs.next()){
+                int id = rs.getInt("Doctor_ID");
+                String name = rs.getString("Doctor_name");
+                String spec = rs.getString("specialization");
+
+                System.out.printf("|  %-10d|  %-39s|  %-33s |\n",id,name,spec);
+                //%-12s = space between two bars i,e => |--12--| ....
+            }
+            System.out.println("+------------+------------------------------------------+-----------------------------------+");
+
+
+        }catch (SQLException e){
+            e.printStackTrace();
+        }
+    }
+    public boolean getDoctorById(int id){
+        String query = "SELECT * FROM doctors where doctor_ID = ?";
+
+        try {
+            PreparedStatement ps = con.prepareStatement(query);
+            ps.setInt(1,id);
+
+            ResultSet rs = ps.executeQuery();
+            if(rs.next()){
+
+              return true;
+            }
+            else{
+                System.out.println("Sorry,the Doctor is not present.");
+            }
+        }catch (SQLException e){
+            System.out.println(e.getMessage());
+        }
+        return false;
+    }
+}
