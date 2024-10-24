@@ -1,0 +1,266 @@
+package Hospital_Management_System;
+
+import java.sql.*;
+import java.util.Scanner;
+
+//Hospital Management System-------------------------------------->
+public class Main {
+    private static final String url = "jdbc:mysql://localhost:3306/hospital";
+    private static final String user = "root";
+    private static final String psd = "your password";
+                                 //give your password here
+
+
+    public static void main(String[] args) {
+
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+        }catch (ClassNotFoundException e){
+            e.printStackTrace();
+        }
+        Scanner sc = new Scanner(System.in);
+
+        try {
+
+            Connection con = DriverManager.getConnection(url,user,psd);
+            System.out.println("Connected to database");
+
+            Patients p = new Patients (con,sc);
+            Doctors d = new Doctors(con);
+
+            while(true){
+                System.out.println("HOSPITAL MANAGEMENT SYSTEM");
+                System.out.println("1.Add Patient");
+                System.out.println("2.View Patients");
+                System.out.println("3.View Doctors");
+                System.out.println("4.Book appointment");
+                System.out.println("5.View Patient History");
+                System.out.println("6.Exit");
+
+                System.out.println("Enter your choice: ");
+                int ch = sc.nextInt();
+
+                switch (ch){
+                    case 1:
+                        p.addpatient();
+                        System.out.println();
+                        break;
+                        //add patient;
+                    case 2:
+                        p.viewPatients();
+                        System.out.println();
+                        break;
+                        //view patient;
+                    case 3:
+                        d.viewDoctors();
+                        System.out.println();
+                        break;
+                        //view doctors;
+                    case 4:
+                        bookAppointment(p,d,con,sc);
+                        System.out.println();
+                        break;
+                        //book appointment;
+                    case 5:
+                        viewPatientHistory(con,sc);
+                        System.out.println();
+                        break;
+                        //view patient history
+                    case 6:
+                        System.out.println("Thank you for using the system");
+                        return;
+                    default:
+                        System.out.println("Enter a valid choice!!!");
+                        break;
+                }
+            }
+
+        }catch (SQLException e){
+            e.printStackTrace();
+        }
+    }
+
+    public static void bookAppointment(Patients p,Doctors d,Connection con, Scanner sc){
+        //as patient & doctor class instance is jot present int his clas , so we have to pass instance of those classes.
+        boolean isAppointmentSuccess = false;
+        System.out.println("Enter Patient ID: ");
+        int p_id = sc.nextInt();
+        System.out.println("Enter Doctor ID: ");
+        int d_id = sc.nextInt();
+        System.out.println("Enter Appointment Date(YYYY-MM-DD): ");
+        String app_date = sc.next();
+
+        try {
+            con.setAutoCommit(false);
+            //cuz we want to manually control the transaction initially
+
+            if(p.getPatientById(p_id) && d.getDoctorById(d_id)){
+
+                if(checkDoctorAvailability(d_id,app_date,con)){
+                    String query = "INSERT INTO appointments(Patient_id,doctor_id,appointment_date) Values(?, ?, ?)";
+                    try {
+                        PreparedStatement ps = con.prepareStatement(query);
+                        ps.setInt(1,p_id);
+                        ps.setInt(2,d_id);
+                        ps.setString(3,app_date);
+
+                        int affectedRows =  ps.executeUpdate();
+                        if(affectedRows > 0){
+                            System.out.println("Appointment Booked Successfully.");
+
+                        }
+                        else {
+                            System.out.println("Sorry, Failed to book appointment.");
+                            System.out.println("Please try again.");
+                            con.rollback();
+                            return;
+                        }
+                        isAppointmentSuccess = true;
+                        if(isAppointmentSuccess){
+                            System.out.println("Would you like to add Patient History ?(Y/N)");
+                            String ch = sc.next();
+                            sc.nextLine();
+
+                            if(ch.equalsIgnoreCase("Y")){
+                                System.out.println("Enter the Diagnosis:");
+                                String dig = sc.nextLine();
+
+                                System.out.println("Enter the Treatment prescribed by the doctor:");
+                                String trt = sc.nextLine();
+
+                                addPatientHistory(p_id,d_id,app_date,dig,trt,con);
+//                         System.out.println("Patient history updated successfully.");
+
+                            }
+                            else {
+                                System.out.println("Patient history int updated successfully.");
+                            }
+                        }
+
+                    }catch (SQLException e){
+                        e.printStackTrace();
+                    }
+                 con.commit();
+                }
+            }
+            else{
+                if(!p.getPatientById(p_id)){
+                    System.out.println("The patient with id "+p_id+" doesn't exist!!");
+                    con.rollback();
+                }
+                if(!d.getDoctorById(d_id)){
+                    System.out.println("The Doctor with id "+d_id+" doesn't exist!!");
+                    con.rollback();
+                }
+            }
+
+
+        }
+        catch (SQLException e){
+            try {
+                con.rollback();
+            }catch (SQLException rollback){
+                rollback.printStackTrace();
+            }
+            e.printStackTrace();
+        }
+        finally {
+            try {
+                con.setAutoCommit(true);
+            }catch (SQLException e){
+                e.printStackTrace();
+            }
+        }
+
+
+
+    }
+
+    public static void viewPatientHistory(Connection con,Scanner sc){
+        System.out.println("Enter the Patient ID : ");
+        int patient_ID = sc.nextInt();
+
+        String query = "SELECT * FROM patient_history WHERE patient_ID = ?";
+        try{
+            PreparedStatement ps = con.prepareStatement(query);
+            ps.setInt(1,patient_ID);
+            ResultSet rs = ps.executeQuery();
+            if(!rs.isBeforeFirst()){
+                System.out.println("Sorry,No history found for the patient.");
+                return;
+            }
+
+            System.out.println("+-----+--------------+--------------+-------------------+---------------------------+------------------------------+");
+            System.out.println("| ID  |  Patient_ID  |  Doctor_ID   | Visit_Date        | Diagnosis                 |  Treatment                   |");
+            System.out.println("+-----+--------------+--------------+-------------------+---------------------------+------------------------------+");
+
+            while(rs.next()){
+                int id = rs.getInt("ID");
+                int p_id = rs.getInt("patient_ID");
+                int d_id = rs.getInt("doctor_ID");
+                String date = rs.getString(4);
+                String dig = rs.getString(5);
+                String trt = rs.getString(6);
+                System.out.printf("|%-5d|%-14d|%-14d|%-19s|%-27s|%-30s|\n",id,p_id,d_id,date,dig,trt);
+
+            }
+            System.out.println("+-----+--------------+--------------+-------------------+---------------------------+------------------------------+");
+
+
+        }catch (SQLException e){
+            e.printStackTrace();
+        }
+
+    }
+
+    public static void addPatientHistory(int p_id,int d_id,String app_date,String dig,String trt,Connection con){
+        String query = "INSERT INTO patient_history(Patient_ID,doctor_ID, Visit_date,Diagnosis,Treatment) VALUES (?,?,?,?,?)";
+        try {
+            PreparedStatement ps = con.prepareStatement(query);
+            ps.setInt(1,p_id);
+            ps.setInt(2,d_id);
+            ps.setString(3,app_date);
+            ps.setString(4,dig);
+            ps.setString(5,trt);
+
+
+           // ps.executeQuery();
+            int aff_rows =  ps.executeUpdate();
+            if(aff_rows>0){
+                System.out.println("Patient history updated successfully.");
+            }
+            else{
+                System.out.println("Ohoo, Some error occurred");
+            }
+
+        }catch (SQLException e){
+            e.printStackTrace();
+        }
+    }
+
+
+    public static boolean checkDoctorAvailability(int doc_id, String app_date, Connection con){
+        String query = "SELECT COUNT(*) FROM appointments where doctor_id = ? AND appointment_date = ?";
+        try {
+            PreparedStatement ps = con.prepareStatement(query);
+            ps.setInt(1,doc_id);
+            ps.setString(2,app_date);
+
+            ResultSet rs  = ps.executeQuery();
+            if(rs.next()){
+                int count = rs.getInt(1);
+                if(count==0){
+                    return true;
+                }
+                else{
+                    return false;
+                }
+            }
+
+        }catch (SQLException e){
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+}
